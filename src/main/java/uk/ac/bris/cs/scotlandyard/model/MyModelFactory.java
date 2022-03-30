@@ -7,7 +7,10 @@ import javax.annotation.Nonnull;
 import com.google.common.collect.ImmutableSet;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * cw-model
@@ -18,79 +21,91 @@ public final class MyModelFactory implements Factory<Model> {
 	@Nonnull @Override public Model build(GameSetup setup,
 	                                      Player mrX,
 	                                      ImmutableList<Player> detectives) {
-		// TODO
+		List<Model.Observer> observerList = new ArrayList<>();
+		return new Model() {
+			Board.GameState Board = new MyGameStateFactory().build(setup, mrX, detectives);
 
-		Model gameModel = new Model() {
 			@Nonnull
 			@Override
 			public Board getCurrentBoard() {
-				Board currentBoard = new Board() {
+
+				return new Board() {
 					@Nonnull
 					@Override
 					public GameSetup getSetup() {
-						return null;
+						return Board.getSetup();
 					}
 
 					@Nonnull
 					@Override
 					public ImmutableSet<Piece> getPlayers() {
-						return null;
+						return Board.getPlayers();
 					}
 
 					@Nonnull
 					@Override
 					public Optional<Integer> getDetectiveLocation(Piece.Detective detective) {
-						return Optional.empty();
+						return Board.getDetectiveLocation(detective);
 					}
 
 					@Nonnull
 					@Override
 					public Optional<TicketBoard> getPlayerTickets(Piece piece) {
-						return Optional.empty();
+						return Board.getPlayerTickets(piece);
 					}
 
 					@Nonnull
 					@Override
 					public ImmutableList<LogEntry> getMrXTravelLog() {
-						return null;
+						return Board.getMrXTravelLog();
 					}
 
 					@Nonnull
 					@Override
 					public ImmutableSet<Piece> getWinner() {
-						return null;
+						return Board.getWinner();
 					}
 
 					@Nonnull
 					@Override
 					public ImmutableSet<Move> getAvailableMoves() {
-						return null;
+						return Board.getAvailableMoves();
 					}
 				};
-				return null;
 			}
 
 			@Override
 			public void registerObserver(@Nonnull Observer observer) {
-
+				if (observer == null) { throw new NullPointerException(); }
+				else if (!(observerList.contains(observer))) { observerList.add(observer); }
+				else { throw new IllegalArgumentException(); }
 			}
 
 			@Override
 			public void unregisterObserver(@Nonnull Observer observer) {
-
+				if (observer == null) { throw new NullPointerException(); }
+				else if (!(observerList.contains(observer))) { throw new IllegalArgumentException(); }
+				else { observerList.remove(observer); }
 			}
 
 			@Nonnull
 			@Override
 			public ImmutableSet<Observer> getObservers() {
-				return null;
+				return ImmutableSet.copyOf(observerList);
 			}
 
 			@Override
 			public void chooseMove(@Nonnull Move move) {
+				Board = Board.advance(move);
+				Board currentBoard = getCurrentBoard();
+
+				if (!currentBoard.getWinner().isEmpty()){
+					getObservers().forEach(x -> x.onModelChanged(currentBoard, Observer.Event.GAME_OVER));
+				} else {
+					getObservers().forEach(x -> x.onModelChanged(currentBoard, Observer.Event.MOVE_MADE));
+				}
 
 			}
 		};
-		throw new RuntimeException("Implement me!");
 	}
 }
