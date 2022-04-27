@@ -12,15 +12,15 @@ import java.util.stream.StreamSupport;
  * Stage 1: Complete this class
  */
 public final class MyGameStateFactory implements Factory<GameState> {
-	
-	private final class MyGameState implements GameState {
-		private GameSetup setup;
+
+	private static final class MyGameState implements GameState {
+		private final GameSetup setup;
 		private ImmutableSet<Piece> remaining;
-		private ImmutableList<LogEntry> log;
+		private final ImmutableList<LogEntry> log;
 		private Player mrX;
-		private List<Player> detectives;
-		private List<Player> Players = new ArrayList<>();
-		private HashSet<Move> hashMoves = new HashSet<>();
+		private final List<Player> detectives;
+		private final List<Player> Players = new ArrayList<>();
+		private final HashSet<Move> hashMoves = new HashSet<>();
 
 		private MyGameState(final GameSetup setup,
 							final ImmutableSet<Piece> remaining,
@@ -38,7 +38,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		}
 
 		// Checking game state obeys game rules
-		private void ruleChecks(){
+		private void ruleChecks() {
 			// Check if there is no MrX in-game
 			if (!this.mrX.isMrX()) {
 				throw new IllegalArgumentException("No MRX");
@@ -68,23 +68,19 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private static Set<Move.SingleMove> makeSingleMoves(GameSetup setup,
 															List<Player> detectives,
 															Player player,
-															int source){
-
+															int source) {
 			Set<Move.SingleMove> moveSet = new HashSet<>();
 
-			for(int destination : setup.graph.adjacentNodes(source)) {
-				if (detectives.stream().anyMatch(x -> x.location() == destination)){
-					continue;
-				}
-
-				for(ScotlandYard.Transport t: setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of()) ) {
-					if (player.has(t.requiredTicket())) {
-						moveSet.add(new Move.SingleMove(player.piece(), source, t.requiredTicket(), destination));
+			for (int destination : setup.graph.adjacentNodes(source)) {
+				if (detectives.stream().noneMatch(x -> x.location() == destination)) {
+					for (ScotlandYard.Transport t: Objects.requireNonNull(setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of()))) {
+						if (player.has(t.requiredTicket())) {
+							moveSet.add(new Move.SingleMove(player.piece(), source, t.requiredTicket(), destination));
+						}
 					}
-				}
-
-				if (player.has(ScotlandYard.Ticket.SECRET)){
-					moveSet.add((new Move.SingleMove(player.piece(), source, ScotlandYard.Ticket.SECRET, destination)));
+					if (player.has(ScotlandYard.Ticket.SECRET)) {
+						moveSet.add((new Move.SingleMove(player.piece(), source, ScotlandYard.Ticket.SECRET, destination)));
+					}
 				}
 			}
 			return moveSet;
@@ -93,70 +89,115 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private static Set<Move.DoubleMove> makeDoubleMoves(GameSetup setup,
 															List<Player> detectives,
 															Player MrX,
-															int source){
+															int source) {
 			Set<Move.DoubleMove> moveSet = new HashSet<>();
 
-			for(int destination1 : setup.graph.adjacentNodes(source)) {
-				if (detectives.stream().anyMatch(x -> x.location() == destination1)){
-					continue;
-				}
-
-				for(ScotlandYard.Transport firstTicket : setup.graph.edgeValueOrDefault(source, destination1, ImmutableSet.of()) ) {
-					for (int destination2 : setup.graph.adjacentNodes(destination1)) {
-						if (detectives.stream().anyMatch(x -> x.location() == destination2)) {
-							continue;
-						}
-
-						for (ScotlandYard.Transport secondTicket : setup.graph.edgeValueOrDefault(destination1, destination2, ImmutableSet.of())) {
-							if ((firstTicket == secondTicket) && (MrX.hasAtLeast(firstTicket.requiredTicket(), 2))){
-								moveSet.add(new Move.DoubleMove(MrX.piece(),
-										source,
-										firstTicket.requiredTicket(),
-										destination1,
-										secondTicket.requiredTicket(),
-										destination2));
-							}
-
-							else if ((firstTicket != secondTicket) && MrX.has(firstTicket.requiredTicket()) && MrX.has(secondTicket.requiredTicket())) {
-								moveSet.add(new Move.DoubleMove(MrX.piece(),
-										source,
-										firstTicket.requiredTicket(),
-										destination1,
-										secondTicket.requiredTicket(),
-										destination2));
-							}
-
-							if ((MrX.has(firstTicket.requiredTicket())) && (MrX.has(ScotlandYard.Ticket.SECRET))){
-								moveSet.add(new Move.DoubleMove(MrX.piece(),
-										source,
-										firstTicket.requiredTicket(),
-										destination1,
-										ScotlandYard.Ticket.SECRET,
-										destination2));
-							}
-
-							if ((MrX.has(secondTicket.requiredTicket())) && (MrX.has(ScotlandYard.Ticket.SECRET))){
-								moveSet.add(new Move.DoubleMove(MrX.piece(),
-										source,
-										ScotlandYard.Ticket.SECRET,
-										destination1,
-										secondTicket.requiredTicket(),
-										destination2));
-							}
-
-							if (MrX.hasAtLeast(ScotlandYard.Ticket.SECRET, 2)){
-								moveSet.add(new Move.DoubleMove(MrX.piece(),
-										source,
-										ScotlandYard.Ticket.SECRET,
-										destination1,
-										ScotlandYard.Ticket.SECRET,
-										destination2));
+			for (int destination1 : setup.graph.adjacentNodes(source)) {
+				if (detectives.stream().noneMatch(x -> x.location() == destination1)) {
+					for (ScotlandYard.Transport firstTicket : Objects.requireNonNull(setup.graph.edgeValueOrDefault(source, destination1, ImmutableSet.of()))) {
+						for (int destination2 : setup.graph.adjacentNodes(destination1)) {
+							if (detectives.stream().noneMatch(x -> x.location() == destination2)) {
+								for (ScotlandYard.Transport secondTicket : Objects.requireNonNull(setup.graph.edgeValueOrDefault(destination1, destination2, ImmutableSet.of()))) {
+									// DoubleMove uses 2 tickets of the same type (No Secret Ticket)
+									if ((firstTicket == secondTicket) && (MrX.hasAtLeast(firstTicket.requiredTicket(), 2))) {
+										moveSet.add(new Move.DoubleMove(MrX.piece(), source, firstTicket.requiredTicket(), destination1, secondTicket.requiredTicket(), destination2));
+									}
+									// DoubleMove uses 2 tickets of different types (No Secret Ticket)
+									else if ((firstTicket != secondTicket) && MrX.has(firstTicket.requiredTicket()) && MrX.has(secondTicket.requiredTicket())) {
+										moveSet.add(new Move.DoubleMove(MrX.piece(), source, firstTicket.requiredTicket(), destination1, secondTicket.requiredTicket(), destination2));
+									}
+									// DoubleMove uses Secret ticket for 2nd move
+									if ((MrX.has(firstTicket.requiredTicket())) && (MrX.has(ScotlandYard.Ticket.SECRET))) {
+										moveSet.add(new Move.DoubleMove(MrX.piece(), source, firstTicket.requiredTicket(), destination1, ScotlandYard.Ticket.SECRET, destination2));
+									}
+									// DoubleMove uses Secret ticket for 1st move
+									if ((MrX.has(secondTicket.requiredTicket())) && (MrX.has(ScotlandYard.Ticket.SECRET))) {
+										moveSet.add(new Move.DoubleMove(MrX.piece(), source, ScotlandYard.Ticket.SECRET, destination1, secondTicket.requiredTicket(), destination2));
+									}
+									// DoubleMove uses 2 Secret tickets
+									if (MrX.hasAtLeast(ScotlandYard.Ticket.SECRET, 2)) {
+										moveSet.add(new Move.DoubleMove(MrX.piece(), source, ScotlandYard.Ticket.SECRET, destination1, ScotlandYard.Ticket.SECRET, destination2));
+									}
+								}
 							}
 						}
 					}
 				}
 			}
 			return moveSet;
+		}
+
+		private GameState moveMrX(List<Integer> destinationList, List<ScotlandYard.Ticket> usedTickets) {
+            List<LogEntry> thisTurnLog = new ArrayList<>();
+            List<Integer> revealTurns = new ArrayList<>();
+
+			for (int i = 0; i < this.setup.moves.size(); i++) {
+				if (this.setup.moves.get(i)) { revealTurns.add(i + 1); }
+			}
+
+			// If MrX used a Double Ticket (Add 2 log entries + move MrX to destination2)
+			if (usedTickets.stream().anyMatch(x -> x == ScotlandYard.Ticket.DOUBLE)) {
+				// Add log 2 log entries of the type as shown in this.setup.moves
+				if ((revealTurns.contains(this.log.size() + 1) && (revealTurns.contains(this.log.size() + 2)))) {
+					thisTurnLog.add(LogEntry.reveal(usedTickets.get(0), destinationList.get(0)));
+					thisTurnLog.add(LogEntry.reveal(usedTickets.get(1), destinationList.get(1)));
+				} else if (revealTurns.contains(this.log.size() + 1)) {
+					thisTurnLog.add(LogEntry.reveal(usedTickets.get(0), destinationList.get(0)));
+					thisTurnLog.add(LogEntry.hidden(usedTickets.get(1)));
+				} else if (revealTurns.contains(this.log.size() + 2)) {
+					thisTurnLog.add(LogEntry.hidden(usedTickets.get(0)));
+					thisTurnLog.add(LogEntry.reveal(usedTickets.get(1), destinationList.get(1)));
+				} else {
+					thisTurnLog.add(LogEntry.hidden(usedTickets.get(0)));
+					thisTurnLog.add(LogEntry.hidden(usedTickets.get(1)));
+				}
+				this.mrX = this.mrX.at(destinationList.get(1));
+			} else {
+				// If log entry should be revealed this turn (SingleMove), add revealed LogEntry, else hidden LogEntry
+				if (revealTurns.contains(this.log.size() + 1)) {
+					thisTurnLog.add(LogEntry.reveal(usedTickets.get(0), destinationList.get(0)));
+				} else {
+					thisTurnLog.add(LogEntry.hidden(usedTickets.get(0)));
+				}
+				this.mrX = this.mrX.at(destinationList.get(0));
+			}
+			return new MyGameState(this.setup,
+					ImmutableSet.copyOf(this.detectives.stream().map(Player::piece).toList()),
+					ImmutableList.copyOf(Streams.concat(this.log.stream(), thisTurnLog.stream()).collect(Collectors.toList())),
+					this.mrX,
+					this.detectives);
+		}
+
+		private GameState moveDetective(List<Integer> destinationList,
+										Move move,
+										ImmutableSet<Move> moves,
+										List<Player> newDets) {
+			for (Player detective : this.detectives) {
+				if (detective.piece() == move.commencedBy()) {
+					detective = detective.at(destinationList.get(0)); // Move detective
+					newDets.add(detective.use(move.tickets())); // Subtract ticket + add to updated detectives list
+					this.mrX = this.mrX.give(move.tickets()); // Give used ticket to MrX
+				} else { newDets.add(detective); }
+			}
+
+			this.remaining = ImmutableSet.copyOf(moves.stream()
+					.map(Move::commencedBy)
+					.filter(x -> x != move.commencedBy())
+					.collect(Collectors.toSet()));
+
+			if (this.remaining.isEmpty()) {
+				return new MyGameState(this.setup,
+						ImmutableSet.of(this.mrX.piece()),
+						this.log,
+						this.mrX,
+						newDets);
+			} else {
+				return new MyGameState(this.setup,
+						this.remaining,
+						this.log /* implement getLog */,
+						this.mrX,
+						newDets);
+			}
 		}
 
 		@Nonnull
@@ -183,74 +224,13 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			if (move.commencedBy() == this.mrX.piece()) {
 				List<ScotlandYard.Ticket> usedTickets = StreamSupport.stream(move.tickets().spliterator(), false).toList();
 				this.mrX = this.mrX.use(usedTickets);
-				List<LogEntry> thisTurnLog = new ArrayList<>();
-				List<Integer> revealTurns = new ArrayList<>();
-				for (int i = 0; i < this.setup.moves.size(); i++) {
-					if (this.setup.moves.get(i)) { revealTurns.add(i + 1); }
-				}
 
-				// If MrX used a Double Ticket (Add 2 log entries + move MrX to destination2)
-				if (usedTickets.stream().anyMatch(x -> x == ScotlandYard.Ticket.DOUBLE)){
-					// Add log 2 log entries of the type as shown in this.setup.moves
-					if ((revealTurns.contains(this.log.size() + 1) && (revealTurns.contains(this.log.size() + 2)))) {
-						thisTurnLog.add(LogEntry.reveal(usedTickets.get(0), destinationList.get(0)));
-						thisTurnLog.add(LogEntry.reveal(usedTickets.get(1), destinationList.get(1)));
-					} else if (revealTurns.contains(this.log.size() + 1)) {
-						thisTurnLog.add(LogEntry.reveal(usedTickets.get(0), destinationList.get(0)));
-						thisTurnLog.add(LogEntry.hidden(usedTickets.get(1)));
-					} else if (revealTurns.contains(this.log.size() + 2)) {
-						thisTurnLog.add(LogEntry.hidden(usedTickets.get(0)));
-						thisTurnLog.add(LogEntry.reveal(usedTickets.get(1), destinationList.get(1)));
-					} else {
-						thisTurnLog.add(LogEntry.hidden(usedTickets.get(0)));
-						thisTurnLog.add(LogEntry.hidden(usedTickets.get(1)));
-					}
-					this.mrX = this.mrX.at(destinationList.get(1));
-				} else {
-					// If log entry should be revealed this turn (SingleMove), add revealed LogEntry, else hidden LogEntry
-					if (revealTurns.contains(this.log.size() + 1)){
-						thisTurnLog.add(LogEntry.reveal(usedTickets.get(0), destinationList.get(0)));
-					} else {
-						thisTurnLog.add(LogEntry.hidden(usedTickets.get(0)));
-					}
-					this.mrX = this.mrX.at(destinationList.get(0));
-				}
-
-				return new MyGameState(this.setup,
-						ImmutableSet.copyOf(this.detectives.stream().map(Player::piece).toList()),
-						ImmutableList.copyOf(Streams.concat(this.log.stream(), thisTurnLog.stream()).collect(Collectors.toList())),
-						this.mrX,
-						this.detectives);
+				return moveMrX(destinationList, usedTickets);
 			}
 			// A detective moves
 			else {
 				List<Player> newDets = new ArrayList<>();
-				for (Player detective : this.detectives) {
-					if (detective.piece() == move.commencedBy()) {
-						detective = detective.at(destinationList.get(0)); // Move detective
-						newDets.add(detective.use(move.tickets())); // Subtract ticket + add to updated detectives list
-						this.mrX = this.mrX.give(move.tickets()); // Give used ticket to MrX
-					} else { newDets.add(detective); }
-				}
-
-				this.remaining = ImmutableSet.copyOf(moves.stream()
-															.map(Move::commencedBy)
-															.filter(x -> x != move.commencedBy())
-															.collect(Collectors.toSet()));
-
-				if (this.remaining.isEmpty()) {
-					return new MyGameState(this.setup,
-							ImmutableSet.of(this.mrX.piece()),
-							this.log,
-							this.mrX,
-							newDets);
-				} else {
-					return new MyGameState(this.setup,
-							this.remaining,
-							this.log /* implement getLog */,
-							this.mrX,
-							newDets);
-				}
+				return moveDetective(destinationList, move, moves, newDets);
 			}
 		}
 
@@ -264,8 +244,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Override
 		public ImmutableSet<Piece> getPlayers() {
 			return ImmutableSet.copyOf(this.Players.stream()
-					.map(Player::piece)
-					.collect(Collectors.toSet()));
+													.map(Player::piece)
+													.collect(Collectors.toSet()));
 		}
 
 		@Nonnull
@@ -275,12 +255,12 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			// calling the .location() method and passing
 			try {
 				Integer detLocation = this.detectives.stream()
-						.filter(x -> x.piece() == detective)
-						.toList()
-						.get(0)
-						.location();
+													.filter(x -> x.piece() == detective)
+													.toList()
+													.get(0)
+													.location();
 				return Optional.of(detLocation);
-			} catch (ArrayIndexOutOfBoundsException e){
+			} catch (ArrayIndexOutOfBoundsException e) {
 				return Optional.empty();
 			}
 		}
@@ -290,11 +270,11 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		public Optional<TicketBoard> getPlayerTickets(Piece piece) {
 			if (this.Players.stream().anyMatch(x -> x.piece() == piece)) {
 				TicketBoard playerTicket = ticket -> this.Players.stream()
-						.filter(x -> x.piece() == piece)
-						.toList()
-						.get(0)
-						.tickets()
-						.get(ticket);
+																.filter(x -> x.piece() == piece)
+																.toList()
+																.get(0)
+																.tickets()
+																.get(ticket);
 				return Optional.of(playerTicket);
 			} else {
 				return Optional.empty();
@@ -310,10 +290,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Nonnull
 		@Override
 		public ImmutableSet<Piece> getWinner() {
-			ImmutableSet<Move> avlMoves = getAvailableMoves();
-
 			// Detective finds MrX, detectives win
-			if ((this.detectives.stream().anyMatch(x -> x.location() == this.mrX.location()))){
+			if ((this.detectives.stream().anyMatch(x -> x.location() == this.mrX.location()))) {
 				return ImmutableSet.copyOf(this.detectives.stream().map(Player::piece).collect(Collectors.toSet()));
 			}
 			// All detective have no more moves
@@ -325,7 +303,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				return ImmutableSet.of(this.mrX.piece());
 			}
 			// MrX has no moves he can make, detectives win
-			else if ((this.remaining.contains(this.mrX.piece()) && (avlMoves.isEmpty()))) {
+			else if ((this.remaining.contains(this.mrX.piece()) && (getAvailableMoves().isEmpty()))) {
 				return ImmutableSet.copyOf(this.detectives.stream().map(Player::piece).collect(Collectors.toSet()));
 			}
 			// Still no winner
@@ -335,15 +313,10 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Nonnull
 		@Override
 		public ImmutableSet<Move> getAvailableMoves() {
-			if ((this.remaining.contains(this.mrX.piece())) && (getMrXTravelLog().size() == getSetup().moves.size())) {
-				return ImmutableSet.of();
-			}
 			if (this.detectives.stream().anyMatch(x -> x.location() == this.mrX.location())) {
 				return ImmutableSet.of();
-			}
-
-			if (this.remaining.contains(this.mrX.piece())){
-				if (this.detectives.stream().allMatch(x -> x.tickets().values().stream().allMatch(y -> y == 0))) {
+			} else if (this.remaining.contains(this.mrX.piece())) {
+				if (this.detectives.stream().allMatch(x -> x.tickets().values().stream().allMatch(y -> y == 0)) || (getMrXTravelLog().size() == getSetup().moves.size())) {
 					return ImmutableSet.of();
 				} else {
 					this.hashMoves.addAll(makeSingleMoves(this.setup, this.detectives, this.mrX, this.mrX.location()));
@@ -352,8 +325,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
 					}
 				}
 			} else {
-				for (Player detective: this.detectives){
-					if (this.remaining.stream().anyMatch(x -> x == detective.piece())){
+				for (Player detective: this.detectives) {
+					if (this.remaining.stream().anyMatch(x -> x == detective.piece())) {
 						this.hashMoves.addAll((makeSingleMoves(this.setup, this.detectives, detective, detective.location())));
 					}
 				}
@@ -362,10 +335,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		}
 	}
 
-	@Nonnull @Override public GameState build(
-			GameSetup setup,
-			Player mrX,
-			ImmutableList<Player> detectives) {
+	@Nonnull @Override public GameState build(GameSetup setup,
+												Player mrX,
+												ImmutableList<Player> detectives) {
 		return new MyGameState(setup, ImmutableSet.of(Piece.MrX.MRX), ImmutableList.of(), mrX, detectives);
 	}
 }

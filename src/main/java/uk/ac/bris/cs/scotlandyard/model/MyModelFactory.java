@@ -1,16 +1,13 @@
 package uk.ac.bris.cs.scotlandyard.model;
 
 import com.google.common.collect.ImmutableList;
-
-import javax.annotation.Nonnull;
-
 import com.google.common.collect.ImmutableSet;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * cw-model
@@ -99,12 +96,11 @@ public final class MyModelFactory implements Factory<Model> {
 				Board = Board.advance(move);
 				Board currentBoard = getCurrentBoard();
 
-				if (!currentBoard.getWinner().isEmpty()){
-					getObservers().forEach(x -> x.onModelChanged(currentBoard, Observer.Event.GAME_OVER));
-				} else {
+				if (currentBoard.getWinner().isEmpty()) {
 					getObservers().forEach(x -> x.onModelChanged(currentBoard, Observer.Event.MOVE_MADE));
+				} else {
+					getObservers().forEach(x -> x.onModelChanged(currentBoard, Observer.Event.GAME_OVER));
 				}
-
 			}
 		};
 	}
